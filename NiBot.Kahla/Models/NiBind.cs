@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NiBot.Kahla.Models
 {
@@ -8,6 +9,13 @@ namespace NiBot.Kahla.Models
     {
         public string Key { get; set; }
         public string Command { get; set; }
-        public bool FullMatch { get; set; }
+        public NiBindMode Mode { get; set; }
+
+        public enum NiBindMode
+        {
+            Match,
+            FullMatch,
+            Regex
+        }
     }
 }
