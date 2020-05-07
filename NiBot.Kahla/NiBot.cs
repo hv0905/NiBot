@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Kahla.SDK.Abstract;
 using Kahla.SDK.Events;
 using Kahla.SDK.Models.ApiViewModels;
+using Microsoft.AspNetCore.Mvc.Internal;
 using NiBot.Kahla.Models;
 
 namespace NiBot.Kahla
@@ -70,28 +68,28 @@ namespace NiBot.Kahla
                     Disruption = "将指定关键字绑定为命令",
                     Handler = async (cmd, context) =>
                     {
-                        Task SendTuto() =>
+                        Task SendDoc() =>
                             SendMessage($"用法: {CommandPrefix}bind (key) (command) [mode:fullMatch|match|regex]\n" +
-                                        $"key: 用于匹配的关键字\n" +
-                                        $"command: 触发时需执行的命令(使用 $& 替代用户输入的内容)" +
-                                        $"mode:\n" +
-                                        $"- fullMatch: 仅当聊天内容完全匹配key时会触发指令（默认）\n" +
-                                        $"- match: 只要聊天内容包含key即会除法指令\n" +
-                                        $"- regex: 使用正则表达式进行匹配（command中可使用 $[index] 来获取正则匹配的结果）\n" +
-                                        $"示例: bind ? \"say 你们又在说些难懂的东西呢~\" fullMatch \n" +
-                                        $"bind ^计算(.+)$ \"calc $1\" regex",
+                                        "key: 用于匹配的关键字\n" +
+                                        "command: 触发时需执行的命令(使用 $& 替代用户输入的内容)" +
+                                        "mode:\n" +
+                                        "- fullMatch: 仅当聊天内容完全匹配key时会触发指令（默认）\n" +
+                                        "- match: 只要聊天内容包含key即会除法指令\n" +
+                                        "- regex: 使用正则表达式进行匹配（command中可使用 $[index] 来获取正则匹配的结果）\n" +
+                                        "示例: bind ? \"say 你们又在说些难懂的东西呢~\" fullMatch \n" +
+                                        "bind ^计算(.+)$ \"calc $1\" regex",
                                 context.ConversationId, context.AESKey);
 
                         if (string.IsNullOrEmpty(cmd))
                         {
-                            await SendTuto();
+                            await SendDoc();
                             return;
                         }
 
                         var cmds = SplitArgs(cmd);
                         if (cmds.Count < 2 || cmds.Count > 3)
                         {
-                            await SendTuto();
+                            await SendDoc();
                             return;
                         }
 
@@ -107,23 +105,20 @@ namespace NiBot.Kahla
                             case "regex":
                                 try
                                 {
-                                    var regex = new Regex(cmds[0]);
+                                    // ReSharper disable once ObjectCreationAsStatement
+                                    new Regex(cmds[0]);
                                 }
                                 catch (ArgumentException)
                                 {
                                     await SendMessage("❌ 正则分析错误", context.ConversationId, context.AESKey);
                                     return;
                                 }
+
                                 bind.Mode = NiBind.NiBindMode.Regex;
                                 break;
                             default:
                                 bind.Mode = NiBind.NiBindMode.FullMatch;
                                 break;
-                        }
-
-                        if (bind.Key.StartsWith(CommandPrefix))
-                        {
-                            await SendMessage($"❌ key不能以{CommandPrefix}开头.", context.ConversationId, context.AESKey);
                         }
 
                         if (!_binds.ContainsKey(context.Message.ConversationId))
@@ -183,6 +178,21 @@ namespace NiBot.Kahla
                         await SendMessage("❌ 找不到这条绑定", context.ConversationId, context.AESKey);
                     }
                 },
+                new NiCommand {
+                    Cmd = "schedule",
+                    ArgFormat = "(m) (h) (dom) (mon) (dow) (command)",
+                    Disruption = "创建一个计划任务"
+                },
+                new NiCommand {
+                    Cmd = "schedule-ls",
+                    ArgFormat = "",
+                    Disruption = "显示所有计划任务"
+                },
+                new NiCommand {
+                    Cmd = "schedule-rm",
+                    ArgFormat = "(uuid)",
+                    Disruption = "删除一个计划任务"
+                },
                 new NiCommand() {
                     Cmd = "calc",
                     ArgFormat = "(expression)",
@@ -197,12 +207,32 @@ namespace NiBot.Kahla
                                 CreateNoWindow = true,
                                 RedirectStandardOutput = true
                             });
+                            // ReSharper disable once PossibleNullReferenceException
                             proc_.WaitForExit();
                             return proc_;
                         });
                         var result = await proc.StandardOutput.ReadToEndAsync();
                         await SendMessage(result, context.ConversationId, context.AESKey);
                     }
+                },
+                new NiCommand {
+                    Cmd = "exec",
+                    ArgFormat = "(command1) (command2) ...",
+                    Disruption = "按顺序执行多条命令",
+                    Handler = async (cmd, context) =>
+                    {
+                        var cmds = SplitArgs(cmd);
+                        foreach (var item in cmds)
+                        {
+                            await ExecuteCommand(item, context);
+                        }
+                    }
+                },
+                new NiCommand {
+                    Cmd = "image-search",
+                    ArgFormat = "[imgPath]",
+                    Disruption = "调用图片搜索api搜索图片,若不提供路径可进入交互模式",
+                    Handler = async (cmd, context) => { await SendMessage("WIP", context.ConversationId, context.AESKey); }
                 },
                 // secure risk maybe
                 // new NiCommand() {
@@ -238,14 +268,15 @@ namespace NiBot.Kahla
             Console.WriteLine("Ni bot Ver 1.0.0");
             Console.WriteLine("Built by EdgeNeko");
             Console.WriteLine("===================");
+            await Task.CompletedTask;
         }
 
         public override async Task OnFriendRequest(NewFriendRequestEvent arg)
         {
-            await CompleteRequest(arg.RequestId, true);
+            await CompleteRequest(arg.Request.Id, true);
             var targetConversation = (await ConversationService.AllAsync())
                 .Items
-                .Single(t => t.UserId == arg.RequesterId);
+                .Single(t => t.UserId == arg.Request.CreatorId);
             await SendMessage($"Welcome to Ni Bot by EdgeNeko.\n输入 {CommandPrefix}help查看可用命令列表", targetConversation.ConversationId, targetConversation.AesKey);
         }
 
@@ -269,8 +300,7 @@ namespace NiBot.Kahla
                         case NiBind.NiBindMode.FullMatch:
                             return t.Key == inputMessage;
                         case NiBind.NiBindMode.Regex:
-                            var regex = new Regex(t.Key);
-                            return regex.IsMatch(inputMessage);
+                            return Regex.IsMatch(inputMessage, t.Key);
                     }
 
                     return false;
@@ -279,8 +309,7 @@ namespace NiBot.Kahla
                 {
                     if (result.Mode == NiBind.NiBindMode.Regex)
                     {
-                        var regex = new Regex(result.Key);
-                        var match = regex.Match(inputMessage);
+                        var match = Regex.Match(inputMessage, result.Key);
                         await ExecuteCommand(match.Result(result.Command), eventContext);
                     }
                     else
@@ -310,7 +339,6 @@ namespace NiBot.Kahla
                     inQuote = !inQuote;
                 if (!inQuote && parmChars[index] == ' ' && !isLastCharSpace)
                     parmChars[index] = '\n';
-
                 isLastCharSpace = parmChars[index] == '\n' || parmChars[index] == ' ';
             }
 

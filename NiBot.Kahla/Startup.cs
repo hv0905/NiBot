@@ -27,6 +27,7 @@ namespace NiBot.Kahla
             };
 
             return new ServiceCollection()
+                .AddHttpClient()
                 .AddScannedDependencies()
                 .AddBots();
         }
