@@ -1,15 +1,13 @@
-﻿using System;
+﻿using Kahla.SDK.Abstract;
+using Kahla.SDK.Events;
+using NiBot.Kahla.Models;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Kahla.SDK.Abstract;
-using Kahla.SDK.Events;
-using Kahla.SDK.Models.ApiViewModels;
-using Microsoft.AspNetCore.Mvc.Internal;
-using NiBot.Kahla.Models;
 
 namespace NiBot.Kahla
 {
@@ -33,17 +31,17 @@ namespace NiBot.Kahla
                         sb.Append($"[i]命令前缀:{CommandPrefix}\n");
                         sb.Append($"显示所有可用的{_commands.Length}条命令.\n");
                         sb.AppendJoin('\n', _commands.Select(t => $"{t.Cmd} {t.ArgFormat}  {t.Disruption}"));
-                        await SendMessage(sb.ToString(), context.ConversationId, context.AESKey);
+                        await SafeSend(sb.ToString(), context.ConversationId);
                     }
                 },
                 new NiCommand {
                     Cmd = "about",
                     ArgFormat = "",
                     Disruption = "显示关于信息",
-                    Handler = async (cmd, context) => await SendMessage("Ni（镍）原子序数为28，具磁性，银白色过渡金属。在自然界中以硅酸镍矿或硫、砷、镍化合物形式存在。性坚韧，有磁性和良好的可塑性，在空气中不被氧化，溶于硝酸。\n" +
+                    Handler = async (cmd, context) => await SafeSend("Ni（镍）原子序数为28，具磁性，银白色过渡金属。在自然界中以硅酸镍矿或硫、砷、镍化合物形式存在。性坚韧，有磁性和良好的可塑性，在空气中不被氧化，溶于硝酸。\n" +
                                                                         "Ni Bot By EdgeNeko\n" +
                                                                         "Github: @hv0905" +
-                                                                        "祝使用愉快^_^", context.ConversationId, context.AESKey)
+                                                                        "祝使用愉快^_^", context.ConversationId)
                 },
                 new NiCommand {
                     Cmd = "say",
@@ -54,11 +52,11 @@ namespace NiBot.Kahla
                         cmd = cmd.Trim('"');
                         if (string.IsNullOrEmpty(cmd))
                         {
-                            await SendMessage($"用法: {CommandPrefix}say (content)\n 可以发送图片, 视频等内容, 参考消息格式文档. \n", context.ConversationId, context.AESKey);
+                            await SafeSend($"用法: {CommandPrefix}say (content)\n 可以发送图片, 视频等内容, 参考消息格式文档. \n", context.ConversationId);
                         }
                         else
                         {
-                            await SendMessage(cmd, context.ConversationId, context.AESKey);
+                            await SafeSend(cmd, context.ConversationId);
                         }
                     }
                 },
@@ -69,7 +67,7 @@ namespace NiBot.Kahla
                     Handler = async (cmd, context) =>
                     {
                         Task SendDoc() =>
-                            SendMessage($"用法: {CommandPrefix}bind (key) (command) [mode:fullMatch|match|regex]\n" +
+                            SafeSend($"用法: {CommandPrefix}bind (key) (command) [mode:fullMatch|match|regex]\n" +
                                         "key: 用于匹配的关键字\n" +
                                         "command: 触发时需执行的命令(使用 $& 替代用户输入的内容)" +
                                         "mode:\n" +
@@ -78,7 +76,7 @@ namespace NiBot.Kahla
                                         "- regex: 使用正则表达式进行匹配（command中可使用 $[index] 来获取正则匹配的结果）\n" +
                                         "示例: bind ? \"say 你们又在说些难懂的东西呢~\" fullMatch \n" +
                                         "bind ^计算(.+)$ \"calc $1\" regex",
-                                context.ConversationId, context.AESKey);
+                                context.ConversationId);
 
                         if (string.IsNullOrEmpty(cmd))
                         {
@@ -110,7 +108,7 @@ namespace NiBot.Kahla
                                 }
                                 catch (ArgumentException)
                                 {
-                                    await SendMessage("❌ 正则分析错误", context.ConversationId, context.AESKey);
+                                    await SafeSend("❌ 正则分析错误", context.ConversationId);
                                     return;
                                 }
 
@@ -128,11 +126,11 @@ namespace NiBot.Kahla
 
                         if (_binds[context.Message.ConversationId].Any(t => t.Key == bind.Key))
                         {
-                            await SendMessage("❌ 已存在相同的关键字.", context.ConversationId, context.AESKey);
+                            await SafeSend("❌ 已存在相同的关键字.", context.ConversationId);
                         }
 
                         _binds[context.Message.ConversationId].Add(bind);
-                        await SendMessage("✔ bind成功", context.ConversationId, context.AESKey);
+                        await SafeSend("✔ bind成功", context.ConversationId);
                     }
                 },
                 new NiCommand {
@@ -146,11 +144,11 @@ namespace NiBot.Kahla
                             var sb = new StringBuilder();
                             sb.Append($"对话id:{context.Message.ConversationId}\n显示所有{_binds[context.Message.ConversationId].Count}条绑定\n");
                             sb.AppendJoin("\n\n", _binds[context.Message.ConversationId].Select(t => $"关键字:{t.Key}\n命令:{t.Command}\n模式: {t.Mode}"));
-                            await SendMessage(sb.ToString(), context.ConversationId, context.AESKey);
+                            await SafeSend(sb.ToString(), context.ConversationId);
                         }
                         else
                         {
-                            await SendMessage($"对话{context.Message.ConversationId}没有任何绑定.", context.ConversationId, context.AESKey);
+                            await SafeSend($"对话{context.Message.ConversationId}没有任何绑定.", context.ConversationId);
                         }
                     }
                 },
@@ -162,7 +160,7 @@ namespace NiBot.Kahla
                     {
                         if (string.IsNullOrEmpty(cmd))
                         {
-                            await SendMessage($"用法: {CommandPrefix}bind-rm (key)", context.ConversationId, context.AESKey);
+                            await SafeSend($"用法: {CommandPrefix}bind-rm (key)", context.ConversationId);
                             return;
                         }
 
@@ -171,11 +169,11 @@ namespace NiBot.Kahla
                             cmd = cmd.Trim('"');
                             if (_binds[context.Message.ConversationId].RemoveAll(t => t.Key == cmd) != 0)
                             {
-                                await SendMessage("✔ 移除成功", context.ConversationId, context.AESKey);
+                                await SafeSend("✔ 移除成功", context.ConversationId);
                             }
                         }
 
-                        await SendMessage("❌ 找不到这条绑定", context.ConversationId, context.AESKey);
+                        await SafeSend("❌ 找不到这条绑定", context.ConversationId);
                     }
                 },
                 new NiCommand {
@@ -199,7 +197,7 @@ namespace NiBot.Kahla
                     Disruption = "计算指定数学表达式",
                     Handler = async (cmd, context) =>
                     {
-                        if (string.IsNullOrWhiteSpace(cmd)) await SendMessage("❌ 无法计算空白的表达式", context.ConversationId, context.AESKey);
+                        if (string.IsNullOrWhiteSpace(cmd)) await SafeSend("❌ 无法计算空白的表达式", context.ConversationId);
                         var proc = await Task.Run(() =>
                         {
                             var proc_ = Process.Start(new ProcessStartInfo("qalc/qalc", cmd) {
@@ -212,7 +210,7 @@ namespace NiBot.Kahla
                             return proc_;
                         });
                         var result = await proc.StandardOutput.ReadToEndAsync();
-                        await SendMessage(result, context.ConversationId, context.AESKey);
+                        await SafeSend(result, context.ConversationId);
                     }
                 },
                 new NiCommand {
@@ -232,7 +230,7 @@ namespace NiBot.Kahla
                     Cmd = "image-search",
                     ArgFormat = "[imgPath]",
                     Disruption = "调用图片搜索api搜索图片,若不提供路径可进入交互模式",
-                    Handler = async (cmd, context) => { await SendMessage("WIP", context.ConversationId, context.AESKey); }
+                    Handler = async (cmd, context) => { await SafeSend("WIP", context.ConversationId); }
                 },
                 // secure risk maybe
                 // new NiCommand() {
@@ -274,13 +272,13 @@ namespace NiBot.Kahla
         public override async Task OnFriendRequest(NewFriendRequestEvent arg)
         {
             await CompleteRequest(arg.Request.Id, true);
-            var targetConversation = (await ConversationService.AllAsync())
-                .Items
-                .Single(t => t.UserId == arg.Request.CreatorId);
-            await SendMessage($"Welcome to Ni Bot by EdgeNeko.\n输入 {CommandPrefix}help查看可用命令列表", targetConversation.ConversationId, targetConversation.AesKey);
+            var targetConversation = EventSyncer.Contacts
+                .FirstOrDefault(t => t.UserId == arg.Request.CreatorId);
+            if (targetConversation != null)
+            {
+                await SafeSend($"Welcome to Ni Bot by EdgeNeko.\n输入 {CommandPrefix}help查看可用命令列表", targetConversation.ConversationId);
+            }
         }
-
-        public override async Task OnGroupConnected(SearchedGroup @group) { }
 
         public override async Task OnMessage(string inputMessage, NewMessageEvent eventContext)
         {
@@ -301,6 +299,8 @@ namespace NiBot.Kahla
                             return t.Key == inputMessage;
                         case NiBind.NiBindMode.Regex:
                             return Regex.IsMatch(inputMessage, t.Key);
+                        default:
+                            break;
                     }
 
                     return false;
@@ -319,8 +319,6 @@ namespace NiBot.Kahla
                 }
             }
         }
-
-        public override async Task OnGroupInvitation(int groupId, NewMessageEvent eventContext) { }
 
         public List<string> SplitArgs(string commandLine)
         {
@@ -348,7 +346,7 @@ namespace NiBot.Kahla
         public async Task ExecuteCommand(string cmd, NewMessageEvent context)
         {
             string key = cmd.Split(' ').Length > 0 ? cmd.Split(' ')[0] : string.Empty;
-            if (string.IsNullOrEmpty(key)) await SendMessage($"输入 {CommandPrefix} help 查看可用指令.", context.ConversationId, context.AESKey);
+            if (string.IsNullOrEmpty(key)) await SafeSend($"输入 {CommandPrefix} help 查看可用指令.", context.ConversationId);
             var matchCommand = _commands.FirstOrDefault(t => t.Cmd == key);
             if (matchCommand != null)
             {
@@ -356,18 +354,18 @@ namespace NiBot.Kahla
             }
             else
             {
-                await SendMessage($"未知指令, 输入 {CommandPrefix} help 查看可用指令.", context.ConversationId, context.AESKey);
+                await SafeSend($"未知指令, 输入 {CommandPrefix} help 查看可用指令.", context.ConversationId);
             }
         }
 
-        public new Task SendMessage(string message, int conversationId, string aesKey)
+        public Task SafeSend(string message, int conversationId)
         {
             if (message.Length > 1000)
             {
                 message = message.Substring(0, 1000) + "...余下部分被截断";
             }
 
-            return base.SendMessage(message, conversationId, aesKey);
+            return SendMessage(message, conversationId);
         }
     }
 }
