@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace NiBot.Kahla.Models
 {
-    class NiBind
+    public class NiBind
     {
         [Key]
         public int Id { get; set; }

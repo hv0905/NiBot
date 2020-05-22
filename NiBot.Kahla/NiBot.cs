@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace NiBot.Kahla
 {
@@ -19,9 +20,9 @@ namespace NiBot.Kahla
         private NiDbContext _dbContext;
         //private Dictionary<int, List<NiBind>> _binds = new Dictionary<int, List<NiBind>>();
 
-        public NiBot()
+        public NiBot(NiDbContext dbContext)
         {
-            _dbContext = new NiDbContext();
+            _dbContext = dbContext;
             _commands = new[] {
                 new NiCommand {
                     Cmd = "help",
@@ -128,6 +129,7 @@ namespace NiBot.Kahla
                             await SafeSend("❌ 已存在相同的关键字.", context.ConversationId);
                         }
 
+                        bind.ConversationId = context.ConversationId;
                         await _dbContext.Binds.AddAsync(bind);
                         await _dbContext.SaveChangesAsync();
                         await SafeSend("✔ bind成功", context.ConversationId);
@@ -164,15 +166,15 @@ namespace NiBot.Kahla
                             await SafeSend($"用法: {CommandPrefix}bind-rm (key)", context.ConversationId);
                             return;
                         }
-                        
-                        if (_binds.ContainsKey(context.Message.ConversationId))
+                        cmd = cmd.Trim('"');
+                        var target = await _dbContext.Binds.Where(t => t.ConversationId == context.Message.ConversationId)
+                            .Where(t => t.Key == cmd)
+                            .FirstOrDefaultAsync();
+                        if (target != null)
                         {
-                            cmd = cmd.Trim('"');
-                            
-                            if (_binds[context.Message.ConversationId].RemoveAll(t => t.Key == cmd) != 0)
-                            {
-                                await SafeSend("✔ 移除成功", context.ConversationId);
-                            }
+                            _dbContext.Binds.Remove(target);
+                            await _dbContext.SaveChangesAsync();
+                            await SafeSend("✔ 移除成功", context.ConversationId);
                         }
 
                         await SafeSend("❌ 找不到这条绑定", context.ConversationId);
@@ -289,9 +291,10 @@ namespace NiBot.Kahla
             {
                 await ExecuteCommand(inputMessage.Substring(CommandPrefix.Length), eventContext);
             }
-            else if (_binds.ContainsKey(eventContext.Message.ConversationId))
+            else
             {
-                var result = _binds[eventContext.Message.ConversationId].FirstOrDefault(t =>
+                var binds = await _dbContext.GetBinds(eventContext.Message.ConversationId);
+                var result = binds.FirstOrDefault(t =>
                 {
                     switch (t.Mode)
                     {

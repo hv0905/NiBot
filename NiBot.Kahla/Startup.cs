@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
+using Microsoft.EntityFrameworkCore;
 
 namespace NiBot.Kahla
 {
@@ -12,8 +13,10 @@ namespace NiBot.Kahla
     {
         public BotBase Bot { get; set; }
 
-        public StartUp(BotSelector botConfigurer)
+        public StartUp(BotSelector botConfigurer, NiDbContext dbContext)
         {
+            // init db
+            dbContext.Database.Migrate();
             Bot = botConfigurer.SelectBot();
         }
 
@@ -30,6 +33,10 @@ namespace NiBot.Kahla
             return new ServiceCollection()
                 .AddHttpClient()
                 .AddScannedDependencies()
+                .AddDbContext<NiDbContext>(options =>
+                {
+                    options.UseSqlite("Data Source=userData.db");
+                })
                 .AddBots();
         }
     }

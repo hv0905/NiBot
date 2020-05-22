@@ -12,7 +12,7 @@ namespace NiBot.Kahla
             StartUp.ConfigureServices()
                 .GetService<StartUp>()
                 .Bot
-                .Start(Environment.UserInteractive).Wait();
+                .Start(true).Wait();
         }
     }
 }
