@@ -16,10 +16,12 @@ namespace NiBot.Kahla
         public static readonly string CommandPrefix = "Ni ";
 
         private readonly NiCommand[] _commands;
-        private Dictionary<int, List<NiBind>> _binds = new Dictionary<int, List<NiBind>>();
+        private NiDbContext _dbContext;
+        //private Dictionary<int, List<NiBind>> _binds = new Dictionary<int, List<NiBind>>();
 
         public NiBot()
         {
+            _dbContext = new NiDbContext();
             _commands = new[] {
                 new NiCommand {
                     Cmd = "help",
@@ -119,17 +121,15 @@ namespace NiBot.Kahla
                                 break;
                         }
 
-                        if (!_binds.ContainsKey(context.Message.ConversationId))
-                        {
-                            _binds.Add(context.Message.ConversationId, new List<NiBind>());
-                        }
+                        var currentBind = await _dbContext.GetBinds(context.Message.ConversationId);
 
-                        if (_binds[context.Message.ConversationId].Any(t => t.Key == bind.Key))
+                        if (currentBind.Any(t => t.Key == bind.Key))
                         {
                             await SafeSend("❌ 已存在相同的关键字.", context.ConversationId);
                         }
 
-                        _binds[context.Message.ConversationId].Add(bind);
+                        await _dbContext.Binds.AddAsync(bind);
+                        await _dbContext.SaveChangesAsync();
                         await SafeSend("✔ bind成功", context.ConversationId);
                     }
                 },
@@ -139,11 +139,12 @@ namespace NiBot.Kahla
                     Disruption = "显示所有绑定的命令",
                     Handler = async (cmd, context) =>
                     {
-                        if (_binds.ContainsKey(context.Message.ConversationId) && _binds[context.Message.ConversationId].Count > 0)
+                        var currentBind = await _dbContext.GetBinds(context.Message.ConversationId);
+                        if (currentBind.Count > 0)
                         {
                             var sb = new StringBuilder();
-                            sb.Append($"对话id:{context.Message.ConversationId}\n显示所有{_binds[context.Message.ConversationId].Count}条绑定\n");
-                            sb.AppendJoin("\n\n", _binds[context.Message.ConversationId].Select(t => $"关键字:{t.Key}\n命令:{t.Command}\n模式: {t.Mode}"));
+                            sb.Append($"对话id:{context.Message.ConversationId}\n显示所有{currentBind.Count}条绑定\n");
+                            sb.AppendJoin("\n\n", currentBind.Select(t => $"关键字:{t.Key}\n命令:{t.Command}\n模式: {t.Mode}"));
                             await SafeSend(sb.ToString(), context.ConversationId);
                         }
                         else
@@ -163,10 +164,11 @@ namespace NiBot.Kahla
                             await SafeSend($"用法: {CommandPrefix}bind-rm (key)", context.ConversationId);
                             return;
                         }
-
+                        
                         if (_binds.ContainsKey(context.Message.ConversationId))
                         {
                             cmd = cmd.Trim('"');
+                            
                             if (_binds[context.Message.ConversationId].RemoveAll(t => t.Key == cmd) != 0)
                             {
                                 await SafeSend("✔ 移除成功", context.ConversationId);

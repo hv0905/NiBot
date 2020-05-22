@@ -25,6 +25,7 @@ namespace NiBot.Kahla
                 DateFormatHandling = DateFormatHandling.IsoDateFormat,
                 ContractResolver = new CamelCasePropertyNamesContractResolver(),
             };
+            
 
             return new ServiceCollection()
                 .AddHttpClient()
